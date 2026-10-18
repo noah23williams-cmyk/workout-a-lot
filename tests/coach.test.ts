@@ -209,3 +209,40 @@ describe('runCoachTurn', () => {
     expect(calls).toBe(2);
   });
 });
+
+describe('account coach (artifact build)', () => {
+  it('keeps instructions first, ends on the user turn, and drops old turns when long', async () => {
+    const { toSampleTurns } = await import('../src/claude/sampleCoach');
+    const long = 'x'.repeat(40_000);
+    const turns = toSampleTurns(
+      [
+        { role: 'user', content: long },
+        { role: 'assistant', content: [{ type: 'text', text: long, citations: null }] },
+        { role: 'user', content: 'recent' },
+        { role: 'assistant', content: 'reply' },
+      ] as never,
+      'now',
+    );
+    expect(turns[0].content).toMatch(/coach built into Workout-a-lot/);
+    expect(turns.at(-1)).toEqual({ role: 'user', content: 'now' });
+    expect(turns[1].role).toBe('user');
+    expect(turns.some((t) => t.content === long)).toBe(false);
+  });
+
+  it('runs page tools against the store and throws tool errors back to Claude', async () => {
+    const { runSampleCoachTurn } = await import('../src/claude/sampleCoach');
+    const store = await freshStore();
+    const sample = Object.assign(
+      async (_input: unknown, opts: { tools: { name: string; execute(i: unknown, c: unknown): unknown }[] }) => {
+        const log = opts.tools.find((t) => t.name === 'log_measurement')!;
+        await log.execute({ type: 'body_weight', value: 81 }, {});
+        await expect(Promise.resolve().then(() => log.execute({ type: 'nope', value: 1 }, {}))).rejects.toThrow(/Invalid input/);
+        return { text: 'Logged.', truncated: false };
+      },
+      { limits: async () => ({ maxPromptBytes: 1 }) },
+    );
+    const history = await runSampleCoachTurn({ sample: sample as never, history: [], userText: 'I weigh 81', store });
+    expect(store.getState().measurements[0].value).toBe(81);
+    expect(toChatItems(history).map((i) => i.text)).toEqual(['I weigh 81', 'Logged a measurement', 'Logged.']);
+  });
+});

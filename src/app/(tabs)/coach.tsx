@@ -24,7 +24,7 @@ const SUGGESTIONS = [
 ];
 
 export default function Coach() {
-  const { history, status, send, clear, apiKey, refreshKey } = useCoach();
+  const { history, status, send, stop, clear, connection, refreshKey } = useCoach();
   const params = useLocalSearchParams<{ prompt?: string }>();
   const [input, setInput] = useState('');
   const list = useRef<FlatList<ChatItem>>(null);
@@ -51,9 +51,11 @@ export default function Coach() {
     send(text);
   };
 
-  if (apiKey === undefined) return null;
+  if (connection.kind === 'loading') {
+    return <ActivityIndicator color={colors.coach} style={{ marginTop: space.xl }} />;
+  }
 
-  if (!apiKey) {
+  if (connection.kind === 'apiKey' && !connection.key) {
     return (
       <View style={{ padding: space.lg }}>
         <Card>
@@ -112,7 +114,11 @@ export default function Coach() {
           blurOnSubmit={Platform.OS === 'web'}
         />
         {status.busy ? (
-          <ActivityIndicator color={colors.coach} style={{ width: 56 }} />
+          connection.kind === 'account' ? (
+            <Button title="Stop" small kind="secondary" onPress={stop} />
+          ) : (
+            <ActivityIndicator color={colors.coach} style={{ width: 56 }} />
+          )
         ) : (
           <Button title="Send" small onPress={() => submit()} disabled={!input.trim()} style={{ backgroundColor: colors.coach }} />
         )}

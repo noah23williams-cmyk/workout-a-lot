@@ -36,15 +36,19 @@ export function createClient(apiKey: string): Anthropic {
   });
 }
 
-export async function loadChat(): Promise<CoachMessage[]> {
+// Chats over the API and over the viewer's Claude account are kept apart:
+// the account chat holds display-only tool entries the API would reject.
+const chatKey = (kind: 'api' | 'account') => (kind === 'api' ? CHAT_KEY : `${CHAT_KEY}/account`);
+
+export async function loadChat(kind: 'api' | 'account' = 'api'): Promise<CoachMessage[]> {
   try {
-    const raw = await Storage.getItemAsync(CHAT_KEY);
+    const raw = await Storage.getItemAsync(chatKey(kind));
     return raw ? (JSON.parse(raw) as CoachMessage[]) : [];
   } catch {
     return [];
   }
 }
 
-export async function saveChat(messages: CoachMessage[]): Promise<void> {
-  await Storage.setItemAsync(CHAT_KEY, JSON.stringify(messages));
+export async function saveChat(messages: CoachMessage[], kind: 'api' | 'account' = 'api'): Promise<void> {
+  await Storage.setItemAsync(chatKey(kind), JSON.stringify(messages));
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { loadApiKey, saveApiKey } from '../../claude/client';
 import { formatNumber, fromKg, toKg, weeklyWorkoutCounts } from '../../domain/calc';
+import { useHostCapability } from '../../lib/claudeHost';
 import { useAppState, useStore } from '../../store/AppStore';
 import { Button, Card, Chip, confirm, Muted, NumberInput, SectionTitle } from '../../ui/components';
 import { colors, radius, space } from '../../ui/theme';
@@ -25,8 +26,10 @@ export default function Profile() {
 
   const [keyInput, setKeyInput] = useState('');
   const [hasKey, setHasKey] = useState(false);
+  const [onAccount, setOnAccount] = useState(false);
   useEffect(() => {
     loadApiKey().then((k) => setHasKey(!!k));
+    useHostCapability('sample').then((sample) => setOnAccount(!!sample));
   }, []);
 
   const update = (patch: Partial<typeof settings>) => store.dispatch({ type: 'updateSettings', patch });
@@ -74,6 +77,15 @@ export default function Profile() {
       </Card>
 
       <SectionTitle>Coach</SectionTitle>
+      {onAccount ? (
+        <Card>
+          <Text style={s.label}>Runs on your Claude account</Text>
+          <Muted style={{ marginTop: 4 }}>
+            No API key needed here. The first time you message the coach, Claude asks you to allow it. Your workouts are
+            saved privately to your account.
+          </Muted>
+        </Card>
+      ) : (
       <Card>
         <Text style={s.label}>Anthropic API key</Text>
         <Muted style={{ marginBottom: space.sm }}>
@@ -130,6 +142,7 @@ export default function Profile() {
           ))}
         </View>
       </Card>
+      )}
 
       <SectionTitle>Settings</SectionTitle>
       <Card style={{ gap: space.md }}>

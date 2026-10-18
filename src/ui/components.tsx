@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Modal,
   Platform,
   Pressable,
   type StyleProp,
@@ -147,10 +148,26 @@ export function NumberInput({
   );
 }
 
-/** Cross-platform confirm; Alert buttons are a no-op on web. */
+interface ConfirmRequest {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  resolve: (ok: boolean) => void;
+}
+
+let showConfirm: ((req: ConfirmRequest) => void) | null = null;
+
+/**
+ * Cross-platform confirm. Native uses the system alert. Web renders an
+ * in-app dialog through <ConfirmHost/>, because browser confirm() is blocked
+ * in some embeds and Alert buttons do nothing on web.
+ */
 export function confirm(title: string, message: string, confirmLabel = 'OK'): Promise<boolean> {
   if (Platform.OS === 'web') {
-    return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? true);
+    return new Promise((resolve) => {
+      if (showConfirm) showConfirm({ title, message, confirmLabel, resolve });
+      else resolve(true);
+    });
   }
   return new Promise((resolve) => {
     Alert.alert(title, message, [
@@ -158,6 +175,40 @@ export function confirm(title: string, message: string, confirmLabel = 'OK'): Pr
       { text: confirmLabel, style: 'destructive', onPress: () => resolve(true) },
     ]);
   });
+}
+
+/** Mount once at the root; renders confirm() dialogs on web. */
+export function ConfirmHost() {
+  const [req, setReq] = useState<ConfirmRequest | null>(null);
+  useEffect(() => {
+    showConfirm = (next) =>
+      setReq((cur) => {
+        cur?.resolve(false);
+        return next;
+      });
+    return () => {
+      showConfirm = null;
+    };
+  }, []);
+  if (!req) return null;
+  const answer = (ok: boolean) => {
+    req.resolve(ok);
+    setReq(null);
+  };
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={() => answer(false)}>
+      <Pressable style={styles.scrim} onPress={() => answer(false)}>
+        <Pressable style={styles.dialog} onPress={() => {}}>
+          <Text style={styles.dialogTitle}>{req.title}</Text>
+          <Text style={styles.muted}>{req.message}</Text>
+          <View style={styles.dialogButtons}>
+            <Button title="Cancel" kind="secondary" onPress={() => answer(false)} style={{ flex: 1 }} />
+            <Button title={req.confirmLabel} onPress={() => answer(true)} style={{ flex: 1 }} />
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
 }
 
 export const styles = StyleSheet.create({
@@ -199,6 +250,23 @@ export const styles = StyleSheet.create({
   muted: { color: colors.muted, fontSize: 14 },
   empty: { alignItems: 'center', padding: space.xl, gap: space.sm },
   emptyTitle: { fontSize: 17, fontWeight: '600', color: colors.text },
+  scrim: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 18, 25, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: space.xl,
+  },
+  dialog: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: space.xl,
+    gap: space.sm,
+  },
+  dialogTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
+  dialogButtons: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
   numberInput: {
     backgroundColor: colors.bg,
     borderRadius: radius.sm,

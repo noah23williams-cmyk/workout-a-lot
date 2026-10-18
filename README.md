@@ -59,6 +59,17 @@ On iOS and Android the key is kept in the Keychain or Keystore (`expo-secure-sto
 
 > If you ship this to other users, put a small backend in front of the API instead of having each user bring a key.
 
+## Run it in the Claude app (no computer needed)
+
+The web build can be published as a private Claude artifact and opened from the Claude app on a phone. In that build:
+- The coach runs on your own Claude account, so no API key is needed. Claude asks you to allow it the first time.
+- Workouts are saved to your private artifact storage as well as the browser. Each saved item is capped at 256 KB, which is roughly a few hundred workouts.
+
+```bash
+npx expo export --platform web
+python3 scripts/build-artifact.py dist workout-a-lot.html   # then publish with the Artifact tool
+```
+
 ## Development
 
 ```bash
